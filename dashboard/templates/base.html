@@ -1,0 +1,604 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Network Operations Center{% endblock %}</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Custom CSS Variables & Base Styles -->
+    <style>
+        :root {
+            --bg-body: #080b11;
+
+            --bg-card: rgba(20, 27, 45, 0.65);
+            --bg-card-hover: rgba(28, 38, 62, 0.8);
+            --border-glow: rgba(59, 130, 246, 0.15);
+            --border-subtle: rgba(255, 255, 255, 0.06);
+            --text-title: #ffffff;
+            --text-main: #cbd5e1;
+            --text-muted: #64748b;
+            --primary: #3b82f6;
+            --primary-glow: rgba(59, 130, 246, 0.35);
+            --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.2);
+            --danger: #f43f5e;
+            --danger-glow: rgba(244, 63, 94, 0.2);
+            --warning: #f59e0b;
+            --warning-glow: rgba(245, 158, 11, 0.2);
+            --font-outfit: 'Outfit', 'Inter', sans-serif;
+            --font-inter: 'Inter', sans-serif;
+
+            --glass-blur: 12px;
+            --shadow-premium: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+            --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Light mode toggle compatibility */
+        body.light-theme {
+            --bg-body: #f3f4f6;
+
+            --bg-card: rgba(255, 255, 255, 0.85);
+            --bg-card-hover: #ffffff;
+            --border-glow: rgba(59, 130, 246, 0.1);
+            --border-subtle: rgba(0, 0, 0, 0.08);
+            --text-title: #1f2937;
+            --text-main: #4b5563;
+            --text-muted: #9ca3af;
+            --primary: #2563eb;
+            --primary-glow: rgba(37, 99, 235, 0.2);
+            --success: #059669;
+            --danger: #dc2626;
+            --warning: #d97706;
+            --shadow-premium: 0 8px 30px 0 rgba(31, 41, 55, 0.06);
+        }
+
+        body.light-theme ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.02);
+        }
+
+        body.light-theme ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        body.light-theme ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.25);
+        }
+
+        /* Top Bar Light Mode Styling */
+        body.light-theme header,
+        body.light-theme .layout-navbar {
+            background: #ffffff !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+        }
+
+        body.light-theme .header-search,
+        body.light-theme .navbar-search-wrapper {
+            background: #f8fafc !important;
+            border-color: #e2e8f0 !important;
+        }
+
+        body.light-theme .header-search input,
+        body.light-theme .navbar-search-wrapper input {
+            color: #1e293b !important;
+        }
+
+        body.light-theme .header-search i,
+        body.light-theme .navbar-search-wrapper i {
+            color: #64748b !important;
+        }
+
+        body.light-theme .action-btn,
+        body.light-theme .theme-toggle,
+        body.light-theme .navbar-nav-right .nav-link {
+            background: #f8fafc !important;
+            border-color: #e2e8f0 !important;
+            color: #475569 !important;
+        }
+
+        body.light-theme .action-btn:hover,
+        body.light-theme .theme-toggle:hover,
+        body.light-theme .navbar-nav-right .nav-link:hover {
+            background: #f1f5f9 !important;
+            color: #3b82f6 !important;
+        }
+
+        body.light-theme .user-name {
+            color: #1e293b !important;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-inter);
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            overflow-x: hidden;
+            transition: background-color 0.4s ease;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 var(--success-glow);
+            animation: pulse-animation 2s infinite;
+        }
+
+        @keyframes pulse-animation {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            }
+
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+            }
+
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+            }
+        }
+
+        /* Main Workspace Layout */
+        .main-wrapper {
+
+            flex-grow: 1;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: var(--transition-smooth);
+        }
+
+
+
+        /* Top Header */
+        header {
+            height: 70px;
+            background: rgba(15, 21, 36, 0.4);
+            backdrop-filter: blur(var(--glass-blur));
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            position: sticky;
+            top: 0;
+            z-index: 90;
+        }
+
+        .header-search {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            padding: 8px 16px;
+            border-radius: 20px;
+            width: 300px;
+            transition: var(--transition-smooth);
+        }
+
+        .header-search:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 10px var(--primary-glow);
+            width: 340px;
+        }
+
+        .header-search input {
+            background: none;
+            border: none;
+            outline: none;
+            color: var(--text-title);
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .header-search input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .header-search i {
+            color: var(--text-muted);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .theme-toggle,
+        .action-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-subtle);
+            color: var(--text-main);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+        }
+
+        .theme-toggle:hover,
+        .action-btn:hover {
+            background: rgba(59, 130, 246, 0.1);
+            color: var(--primary);
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            padding: 4px 12px;
+            border-radius: 12px;
+            transition: var(--transition-smooth);
+        }
+
+        .user-profile:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .user-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), #8b5cf6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-family: var(--font-outfit);
+            box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-title);
+        }
+
+        .user-role {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Page Content container */
+        .content-area {
+            padding: 32px;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Footer */
+        footer {
+            padding: 24px 32px;
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            background: rgba(15, 21, 36, 0.2);
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 992px) {
+
+
+            .main-wrapper {
+                margin-left: 0;
+            }
+
+            .menu-toggle-btn {
+                display: flex !important;
+            }
+        }
+
+        .menu-toggle-btn {
+            display: flex !important;
+            background: none;
+            border: none;
+            color: var(--text-title);
+            font-size: 1.25rem;
+            cursor: pointer;
+            margin-right: 15px;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+
+
+    <!-- Main Workspace -->
+    <div class="main-wrapper">
+        <header>
+            <div style="display: flex; align-items: center;">
+                <button class="menu-toggle-btn" style="cursor:pointer;" onclick="window.location.href='/'" id="bars">
+                    <table style="display: flex; gap: 10px;">
+                        <tr>
+                            <td><i class="fa-solid fa-circle-nodes" style="padding-right: 10px;"></i></td>
+                            <td>
+                                <p style="font-size: 1.2rem; margin: 0;">NOC Dashboard</p>
+                            </td>
+                        </tr>
+                    </table>
+                </button>
+
+            </div>
+            <div class="header-actions">
+                {% block header_actions %}
+                <button class="btn btn-primary btn-sm me-2 fw-semibold" id="addIpBtn" data-bs-toggle="modal"
+                    data-bs-target="#loginModal" style="border-radius: 8px; padding: 6px 16px;">Add IP</button>
+                {% endblock %}
+                <button class="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark theme">
+                    <i id="theme-icon" class="fa-solid fa-moon"></i>
+                </button>
+                <button class="action-btn" title="Refresh metrics" onclick="window.location.reload();">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                </button>
+                {% if user_logged_in %}
+                <button class="action-btn" id="logoutBtn" title="Logout" onclick="performLogout()">
+                    <i class="fa-solid fa-arrow-right-from-bracket" style="color: rgb(220, 43, 23);"></i>
+                </button>
+                {%endif%}
+
+
+
+            </div>
+        </header>
+
+        <main class="content-area">
+            {% block content %}{% endblock %}
+        </main>
+
+        <footer>
+
+            <span>Local Time: <span id="clock">--:--:--</span></span>
+        </footer>
+    </div>
+
+    <!-- UI Logic Scripts -->
+    <script>
+
+        // Toggle Theme between Light & Dark
+        function toggleTheme() {
+            const body = document.body;
+            const themeIcon = document.getElementById('theme-icon');
+            body.classList.toggle('light-theme');
+
+            if (body.classList.contains('light-theme')) {
+                themeIcon.classList.replace('fa-moon', 'fa-sun');
+                localStorage.setItem('noc-theme', 'light');
+            } else {
+                themeIcon.classList.replace('fa-sun', 'fa-moon');
+                localStorage.setItem('noc-theme', 'dark');
+            }
+        }
+
+        // Apply saved theme preference
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedTheme = localStorage.getItem('noc-theme');
+            if (savedTheme === 'light') {
+                document.body.classList.add('light-theme');
+                document.getElementById('theme-icon').classList.replace('fa-moon', 'fa-sun');
+            }
+
+            // Dynamic Clock
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('clock').innerText = now.toLocaleTimeString();
+            }, 1000);
+        });
+    </script>
+
+    <!-- Login Modal -->
+    <div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content"
+                style="border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 10px 40px rgba(0,0,0,0.1); background: #ffffff; color: #475569;">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="loginModalLabel" style="color: #000000 !important;">Login
+                        Credentials</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body px-4 pt-3">
+                    <div id="loginErrorMsg" class="alert alert-danger d-none py-2" role="alert"
+                        style="font-size: 0.85rem;"></div>
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold" style="color: #1e293b;">Username</label>
+                            <input type="text" class="form-control" id="loginUsername" required
+                                style="border-radius: 8px; border: 2px solid #e2e8f0; background: transparent; color: #1e293b;">
+                        </div>
+                        <div class="mb-4">
+                            <label class="form-label small fw-semibold" style="color: #1e293b;">Password</label>
+                            <input type="password" class="form-control" id="loginPassword" required
+                                style="border-radius: 8px; border: 2px solid #e2e8f0; background: transparent; color: #1e293b;">
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 pt-2 border-top mt-2"
+                            style="border-color: #e2e8f0 !important;">
+                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"
+                                style="border-radius: 8px; border-color: #e2e8f0; color: #475569;">Cancel</button>
+                            <button type="submit" class="btn btn-primary px-4" id="loginSubmitBtn"
+                                style="border-radius: 8px;">OK</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logout Modal -->
+    <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content"
+                style="border-radius: 16px; border: 1px solid #e2e8f0; box-shadow: 0 10px 40px rgba(0,0,0,0.1); background: #ffffff; color: #475569;">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold" id="logoutModalLabel" style="color: #000000 !important;">Confirm
+                        Logout</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body px-4 pt-3 pb-3">
+                    <p style="color: #1e293b; font-size: 1rem; margin-bottom: 24px;">Are you sure you want to logout of
+                        the dashboard?</p>
+                    <div class="d-flex justify-content-end gap-2 pt-2 border-top mt-2"
+                        style="border-color: #e2e8f0 !important;">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"
+                            style="border-radius: 8px; border-color: #e2e8f0; color: #475569;">Cancel</button>
+                        <button type="button" class="btn btn-danger px-4" id="confirmLogoutBtn"
+                            style="border-radius: 8px;">Logout</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Logic Script -->
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+            const uname = document.getElementById('loginUsername').value;
+            const pword = document.getElementById('loginPassword').value;
+            const btn = document.getElementById('loginSubmitBtn');
+            const errorDiv = document.getElementById('loginErrorMsg');
+
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
+            btn.disabled = true;
+            errorDiv.classList.add('d-none');
+
+            // Send fetch request to authenticate
+            fetch('/login_api/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ username: uname, password: pword })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = '/add_ip/';
+                    } else {
+                        errorDiv.textContent = data.message || "Invalid credentials.";
+                        errorDiv.classList.remove('d-none');
+                        btn.innerHTML = 'OK';
+                        btn.disabled = false;
+                    }
+                })
+                .catch(error => {
+                    errorDiv.textContent = "Server error occurred. Please try again later.";
+                    errorDiv.classList.remove('d-none');
+                    btn.innerHTML = 'OK';
+                    btn.disabled = false;
+                });
+        });
+    </script>
+    <script>
+        let logoutModalInstance = null;
+
+        function performLogout() {
+            if (!logoutModalInstance) {
+                logoutModalInstance = new bootstrap.Modal(document.getElementById('logoutModal'));
+            }
+            logoutModalInstance.show();
+        }
+
+        document.getElementById('confirmLogoutBtn').addEventListener('click', function () {
+            const btn = this;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Logging out...';
+            btn.disabled = true;
+
+            fetch('/login_api/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ action: 'logout' })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.href = '/';
+                    } else {
+                        btn.innerHTML = 'Logout';
+                        btn.disabled = false;
+                        alert('Error logging out. Please try again.');
+                    }
+                })
+                .catch(error => {
+                    btn.innerHTML = 'Logout';
+                    btn.disabled = false;
+                    alert('Server error occurred. Please try again later.');
+                });
+        });
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+
+</html>

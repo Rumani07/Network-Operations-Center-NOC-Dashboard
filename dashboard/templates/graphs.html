@@ -1,0 +1,358 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sensor Historic Data | NOC Dashboard{% endblock %}
+
+{% block extra_css %}
+<!-- Core Stylesheets -->
+<link rel="stylesheet" href="{% static 'vendor/fonts/iconify-icons.css' %}" />
+<link rel="stylesheet" href="{% static 'vendor/css/core.css' %}" />
+<link rel="stylesheet" href="{% static 'css/demo.css' %}" />
+<link rel="stylesheet" href="{% static 'vendor/libs/perfect-scrollbar/perfect-scrollbar.css' %}" />
+<link rel="stylesheet" href="{% static 'vendor/libs/apex-charts/apex-charts.css' %}" />
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
+<!-- Sneat Head Helper Scripts -->
+<script src="{% static 'vendor/js/helpers.js' %}"></script>
+<script src="{% static 'js/config.js' %}"></script>
+
+<style>
+    /* 
+       Force body/html background to prevent core.css from breaking dark mode 
+       and match AddIP.html
+    */
+    html,
+    body {
+        background-color: var(--bg-body) !important;
+        color: var(--text-main) !important;
+    }
+
+
+
+    /* Premium Theme Style Overrides */
+    .card {
+        background: var(--bg-card) !important;
+        backdrop-filter: blur(var(--glass-blur));
+        border: 1px solid var(--border-subtle) !important;
+        border-radius: 20px !important;
+        box-shadow: var(--shadow-premium) !important;
+        transition: var(--transition-smooth) !important;
+    }
+
+    .card:hover {
+        transform: translateY(-4px);
+        background: var(--bg-card-hover) !important;
+        box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45) !important;
+        border-color: var(--border-glow) !important;
+    }
+
+    .card-header,
+    .card-body {
+        background: transparent !important;
+        color: var(--text-main) !important;
+    }
+
+    .card-title,
+    h4,
+    h5,
+    h6 {
+        font-family: var(--font-outfit, 'Outfit', sans-serif) !important;
+        font-weight: 700;
+        color: var(--text-title) !important;
+    }
+
+    /* Form and Label Overrides for Dark Mode */
+    .text-muted {
+        color: var(--text-muted) !important;
+    }
+
+    label,
+    .form-label {
+        color: var(--text-main) !important;
+    }
+
+    .form-control {
+        background: transparent !important;
+        color: var(--text-main) !important;
+        border: 1px solid var(--border-subtle) !important;
+    }
+
+    .form-control:focus {
+        background: rgba(255, 255, 255, 0.03) !important;
+        border-color: var(--primary) !important;
+        color: var(--text-title) !important;
+        box-shadow: 0 0 10px var(--primary-glow) !important;
+    }
+
+    .static-sidebar {
+        position: sticky;
+        top: 20px;
+    }
+
+    .scrollable-graphs {
+        padding-right: 10px;
+    }
+
+    .scrollable-graphs::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .scrollable-graphs::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .scrollable-graphs::-webkit-scrollbar-thumb {
+        background-color: rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
+    }
+
+    .detail-item {
+        padding: 12px 0;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .detail-item:last-child {
+        border-bottom: none;
+    }
+
+    .detail-label {
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    .detail-val {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: var(--text-title);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h4 class="fw-bold py-3 mb-0">
+            Historic Data #{{ sensor_id }} <span class="text-primary">{{ sensor_details.SensorName }}</span>
+        </h4>
+    </div>
+</div>
+
+<!-- Controls Row -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card p-3">
+            <form id="timelineForm" method="GET" action="" class="d-flex flex-wrap align-items-end gap-3">
+                <input type="hidden" name="sensorID" value="{{ sensor_id }}">
+                <input type="hidden" name="serverID" value="{{ server_id }}">
+                <div class="flex-grow-1">
+                    <label for="startDateTime" class="form-label text-muted small fw-bold">Start Date Time (Default:
+                        now-12h)</label>
+                    <input name="start" type="text" class="form-control datetime-picker" id="startDateTime"
+                        value="{{ start_dt }}" required>
+                </div>
+                <div class="flex-grow-1">
+                    <label for="endDateTime" class="form-label text-muted small fw-bold">End Date Time (now)</label>
+                    <input name="end" type="text" class="form-control datetime-picker" id="endDateTime"
+                        value="{{ end_dt }}" required>
+                </div>
+                <div class="flex-grow-1">
+                    <label for="intervalSeconds" class="form-label text-muted small fw-bold">Interval (seconds, e.g.
+                        3600 for 1h)</label>
+                    <input name="interval" type="number" class="form-control" id="intervalSeconds"
+                        value="{{ interval_secs }}" min="60" step="60" required>
+                </div>
+                <div>
+                    <button type="submit" class="btn btn-primary px-4 py-2 fw-bold"
+                        style="border-radius: 10px;">Search</button>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-primary px-4 py-2 fw-bold"
+                        onclick="getElementById('timelineForm').action='/api/sensor_csv_data/';getElementById('timelineForm').submit();"
+                        style="border-radius: 10px;">Download</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Left side: Scrollable Graphs -->
+    <div class="col-lg-8 col-md-7 mb-4">
+        <div class="scrollable-graphs pe-2">
+
+            <!-- Graph 1: Ping vs Latency -->
+            <div class="card mb-4">
+                <div class="card-header pb-0">
+                    <h5 class="card-title mb-0">Ping Latency</h5>
+                    <small class="text-muted">Ping vs Latency (Time vs ms)</small>
+                </div>
+                <div class="card-body">
+                    <div id="pingChart"></div>
+                </div>
+            </div>
+
+            <!-- Graph 2: Traffic / Bandwidth -->
+            <div class="card mb-4">
+                <div class="card-header pb-0">
+                    <h5 class="card-title mb-0">Traffic Total</h5>
+                    <small class="text-muted">Bandwidth Data (Time vs Volume)</small>
+                </div>
+                <div class="card-body">
+                    <div id="trafficChart"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Right side: Static Details -->
+    <div class="col-lg-4 col-md-5">
+        <div class="card static-sidebar">
+            <div class="card-header border-bottom">
+                <h5 class="card-title mb-0 text-center">Sensor Details</h5>
+
+            </div>
+            <div class="card-body pt-3">
+                <div class="detail-item">
+                    <span class="detail-label">Sensor ID</span>
+                    <span class="detail-val">#{{ sensor_details.SensorID }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Sensor Name</span>
+                    <span class="detail-val text-primary">{{ sensor_details.SensorName }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Sensor Location</span>
+                    <span class="detail-val">{{ sensor_details.Location }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Router Name</span>
+                    <span class="detail-val">{{ sensor_details.RouterName }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Up/Down Status</span>
+                    <span
+                        class="detail-val {% if sensor_details.Status == 'Up' %}text-success{% else %}text-danger{% endif %} fw-bold">
+                        {{ sensor_details.Status }}
+                    </span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Last Ping Latency</span>
+                    <span class="detail-val">{{ sensor_details.LastPingLatency }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'vendor/libs/apex-charts/apexcharts.js' %}"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Initialize datetime pickers
+        flatpickr(".datetime-picker", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+            time_24hr: true,
+            allowInput: true
+        });
+
+        // Safely parse JSON data from Django context
+        // Wrapped in strings to prevent IDE auto-formatters from breaking the template tags
+        const pingDataRaw = JSON.parse("{{ ping_data|escapejs }}");
+        const trafficDataRaw = JSON.parse("{{ traffic_data|escapejs }}");
+
+        const getPrimaryColor = () => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#3b82f6';
+        const getSuccessColor = () => getComputedStyle(document.documentElement).getPropertyValue('--success').trim() || '#10b981';
+
+        const commonChartOptions = {
+            chart: {
+                type: 'area',
+                height: 350,
+                toolbar: { show: false },
+                zoom: { enabled: false },
+                animations: {
+                    enabled: true,
+                    easing: 'easeinout',
+                    speed: 800
+                }
+            },
+            dataLabels: { enabled: false },
+            stroke: { curve: 'smooth', width: 3 },
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    shadeIntensity: 1,
+                    opacityFrom: 0.4,
+                    opacityTo: 0.05,
+                    stops: [0, 90, 100]
+                }
+            },
+            xaxis: {
+                type: 'datetime',
+                labels: {
+                    datetimeUTC: false,
+                    format: 'dd/MM HH:mm'
+                }
+            },
+            tooltip: {
+                x: { format: 'dd MMM yyyy HH:mm' }
+            }
+        };
+
+        // Ping Chart
+        const pingData = pingDataRaw.map(d => {
+            // Assume format is DD/MM/YYYY HH:MM:SS or similar. ApexCharts needs ISO or timestamp.
+            // If it's already an ISO string or timestamp it will work.
+            // For custom format like "01/01/2026 12:00:00" or "14-06-2026 11:30:00", we need parsing.
+            let parts = d.x.split(/[\s/:-]/);
+            let dt;
+            if (parts.length >= 6) {
+                // DD/MM/YYYY HH:MM:SS
+                dt = new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]).getTime();
+            } else {
+                dt = new Date(d.x).getTime();
+            }
+            return [dt, d.y];
+        });
+
+        const pingChart = new ApexCharts(document.querySelector("#pingChart"), {
+            ...commonChartOptions,
+            series: [{ name: 'Latency (ms)', data: pingData }],
+            colors: [getPrimaryColor()],
+            yaxis: {
+                title: { text: 'Latency (ms)' }
+            }
+        });
+        pingChart.render();
+
+        // Traffic Chart
+        const trafficData = trafficDataRaw.map(d => {
+            let parts = d.x.split(/[\s/:-]/);
+            let dt;
+            if (parts.length >= 6) {
+                dt = new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]).getTime();
+            } else {
+                dt = new Date(d.x).getTime();
+            }
+            return [dt, d.y];
+        });
+
+        const trafficChart = new ApexCharts(document.querySelector("#trafficChart"), {
+            ...commonChartOptions,
+            series: [{ name: 'Traffic / Bandwidth', data: trafficData }],
+            colors: [getSuccessColor()],
+            yaxis: {
+                title: { text: 'Volume' }
+            }
+        });
+        trafficChart.render();
+    });
+</script>
+{% endblock %}

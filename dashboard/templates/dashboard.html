@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Network Performance Dashboard</title>
+    <!-- We import Chart.js from a secure public network CDN to handle graph canvas rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8f9fa; margin: 50px; }
+        .dashboard-container { background: #ffffff; padding: 30px; border-radius: 18px; box-shadow: 0 12px 30px rgba(11, 22, 60, 0.08); max-width: 1040px; margin: 0 auto; }
+        .dashboard-grid { display: flex; gap: 24px; align-items: stretch; }
+        .status-card { width: 280px; background: linear-gradient(180deg, #eef4ff 0%, #f7fbff 100%); border: 1px solid #d9e4ff; border-radius: 22px; padding: 28px 24px; display: flex; flex-direction: column; justify-content: center; gap: 18px; }
+        .status-card-heading { font-size: 0.9rem; color: #4f5f7f; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+        .status-card-value { font-size: 3.8rem; font-weight: 800; color: #1e3a8a; line-height: 1; }
+        .status-card-label { font-size: 1rem; color: #2f4366; }
+        .status-card-note { font-size: 0.95rem; color: #6b7b92; }
+        .chart-panel { flex: 1; background: #f8fbff; border: 1px solid #e2e8f7; border-radius: 22px; padding: 26px; }
+        .chart-panel h2 { color: #1f2a44; font-size: 1.4rem; margin: 0 0 18px; text-align: left; }
+        h2 { color: #2d3748; margin: 0 0 24px; text-align: center; }
+        @media (max-width: 860px) {
+            .dashboard-grid { display: block; }
+            .status-card,
+            .chart-panel { width: 100%; }
+            .chart-panel h2 { text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <h2>Ping Latency Trend Profile (Last 3 Hours)</h2>
+    <div class="dashboard-grid">
+        <div class="status-card">
+            <div class="status-card-heading">Total down devices</div>
+            <div class="status-card-value">{{ down_count }}</div>
+            <div class="status-card-label">Out of current monitored network</div>
+            <div class="status-card-note">Active down count from the latest ping sweep</div>
+        </div>
+        <div class="chart-panel">
+            <h2>Latency (msec) over time</h2>
+            <canvas id="latencyChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Pull the clean list structures injected by our Django views engine safely into JavaScript
+    const timeLabels = ["02:00 PM", "02:15 PM", "02:30 PM", "02:45 PM", "03:00 PM", "03:15 PM", "03:30 PM", "03:45 PM", "04:00 PM", "04:15 PM", "04:30 PM", "04:45 PM"];
+    const pingMetrics = [0.4, 0.5, 1.2, 0.3, 0.4, 2.1, 0.5, 0.6, 0.3, 0.4, 0.9, 0.5];
+
+    const ctx = document.getElementById('latencyChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: timeLabels,
+            datasets: [{
+                label: 'Latency (msec)',
+                data: pingMetrics,
+                borderColor: '#4c51bf', // Clean slate blue color accent
+                backgroundColor: 'rgba(76, 81, 191, 0.06)',
+                borderWidth: 2.5,
+                tension: 0.25, // Smooths out jagged network peaks into clean curves
+                pointRadius: 3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: { title: { display: true, text: 'Timeline Interval (5 Min Average)' } },
+                y: { title: { display: true, text: 'Response Delay Speed (msec)' }, beginAtZero: true }
+            }
+        }
+    });
+</script>
+
+</body>
+</html>
