@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the Django project code
 COPY . .
-
+RUN python manage.py collectstatic --noinput
 # Expose port 8000 to allow network traffic to the container
 EXPOSE 8000
 

@@ -2,7 +2,9 @@ from django.db import models
 
 # write class jaise us vid
 class Sensing(models.Model):
+
     id = models.IntegerField(primary_key=True)
+    protocol = models.CharField(max_length=8, default='http')
     ip = models.CharField(max_length=50)
     username = models.CharField(max_length=20, default="")
     passhash = models.CharField(max_length=20, default="")

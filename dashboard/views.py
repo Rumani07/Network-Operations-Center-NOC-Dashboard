@@ -27,7 +27,7 @@ def ping_dashboard(request):
         if dept not in departments:
             departments[dept] = {'id': sensing_obj.id, 'sensors': []}
             
-        URL = f"http://{sensing_obj.ip}/api/table.json?content=sensors&columns=objid,device,sensor,status,lastvalue&output=json&username={sensing_obj.username}&passhash={sensing_obj.passhash}"
+        URL = f"{sensing_obj.protocol}://{sensing_obj.ip}/api/table.json?content=sensors&columns=objid,device,sensor,status,lastvalue&output=json&username={sensing_obj.username}&passhash={sensing_obj.passhash}"
         try:
             response = requests.get(URL, verify=False, timeout=3.0)
             if response.status_code == 200:
@@ -120,9 +120,9 @@ def sensor_graphs_view(request):
             pass
     from .models import Sensing
     sensing = Sensing.objects.get(id=server_id) 
-    sensor_details = get_sensor_details(sensor_id,sensing.ip,sensing.username,sensing.passhash)
+    sensor_details = get_sensor_details(sensor_id,sensing.protocol,sensing.ip,sensing.username,sensing.passhash)
     sensor_details['Location'] = sensing.Site_name
-    historic_data = get_historic_data_api(sensor_id, start_dt, end_dt, interval_secs,sensing.ip,sensing.username,sensing.passhash)
+    historic_data = get_historic_data_api(sensor_id, sensing.protocol, start_dt, end_dt, interval_secs,sensing.ip,sensing.username,sensing.passhash)
     
     # Process historic data for charts
     ping_data = []
@@ -203,9 +203,9 @@ def sensor_csv_data(request):
             pass
     from .models import Sensing
     sensing = Sensing.objects.get(id=server_id) 
-    sensor_details = get_sensor_details(sensor_id,sensing.ip,sensing.username,sensing.passhash)
+    sensor_details = get_sensor_details(sensor_id,sensing.protocol,sensing.ip,sensing.username,sensing.passhash)
     sensor_details['Location'] = sensing.Site_name
-    historic_data = get_historic_data_api(sensor_id, start_dt, end_dt, interval_secs,sensing.ip,sensing.username,sensing.passhash)
+    historic_data = get_historic_data_api(sensor_id, sensing.protocol, start_dt, end_dt, interval_secs,sensing.ip,sensing.username,sensing.passhash)
     
     import csv
     fieldnames=["datetime","datetime_raw","value","value_raw","coverage","coverage_raw"]
@@ -259,20 +259,22 @@ def submit_add_ip(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            ip = data.get('ip', '127.0.0.1')
-            username = data.get('username', 'prtgadmin')
-            passhash = data.get('passhash', '3657463105')
-            site_name = data.get('site_name', 'Rumanikapc')
-            department = data.get('department', 'localhost')
+            ip = data.get('ip')
+            username = data.get('username')
+            passhash = data.get('passhash')
+            site_name = data.get('site_name')
+            department = data.get('department')
+            protocol = data.get('protocol')
             sensors = data.get('sensors', [])
             
             # Find next ID
             max_id = Sensing.objects.aggregate(Max('id'))['id__max']
             next_id = 1 if max_id is None else max_id + 1
-            
+            print(ip,protocol,username,passhash,site_name,department,sensors)
             Sensing.objects.create(
                 id=next_id,
                 ip=ip,
+                protocol=protocol,
                 username=username,
                 passhash=passhash,
                 Site_name=site_name,
@@ -299,7 +301,7 @@ def get_sensors_by_ip_api(request):
                 # Attempt to fetch to verify IP is valid
                 from dashboard.fetch import get_all_sensors_grouped
                 sensors = get_all_sensors_grouped(new_ip, sen.username, sen.passhash)
-                if sensors:
+                if sensors[0]:
                     # Successfully fetched, save IP
                     sen.ip = new_ip
                     sen.save()
@@ -317,7 +319,7 @@ def get_sensors_by_ip_api(request):
                     passhash=data.get('passhash')
                 from dashboard.fetch import get_all_sensors_grouped
                 sensors = get_all_sensors_grouped(ip, username, passhash)
-                return JsonResponse({'success': True, 'sensors': sensors})
+                return JsonResponse({'success': True, 'sensors': sensors[0], 'protocol': sensors[1]})
         except Exception as e:
             return JsonResponse({'success': False, 'message': str(e)})
     return JsonResponse({'success': False, 'message': 'Invalid request method.'})
