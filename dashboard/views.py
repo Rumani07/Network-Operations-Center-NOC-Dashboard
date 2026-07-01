@@ -85,7 +85,7 @@ def ping_dashboard(request):
     }
     
     from django.shortcuts import render
-    return render(request, 'dashboards-analytics-NetworkRuma.html', context)
+    return render(request, 'dashboard.html', context)
     
 
 

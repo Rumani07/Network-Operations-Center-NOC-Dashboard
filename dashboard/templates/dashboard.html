@@ -1,78 +1,821 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Network Performance Dashboard</title>
-    <!-- We import Chart.js from a secure public network CDN to handle graph canvas rendering -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #f8f9fa; margin: 50px; }
-        .dashboard-container { background: #ffffff; padding: 30px; border-radius: 18px; box-shadow: 0 12px 30px rgba(11, 22, 60, 0.08); max-width: 1040px; margin: 0 auto; }
-        .dashboard-grid { display: flex; gap: 24px; align-items: stretch; }
-        .status-card { width: 280px; background: linear-gradient(180deg, #eef4ff 0%, #f7fbff 100%); border: 1px solid #d9e4ff; border-radius: 22px; padding: 28px 24px; display: flex; flex-direction: column; justify-content: center; gap: 18px; }
-        .status-card-heading { font-size: 0.9rem; color: #4f5f7f; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
-        .status-card-value { font-size: 3.8rem; font-weight: 800; color: #1e3a8a; line-height: 1; }
-        .status-card-label { font-size: 1rem; color: #2f4366; }
-        .status-card-note { font-size: 0.95rem; color: #6b7b92; }
-        .chart-panel { flex: 1; background: #f8fbff; border: 1px solid #e2e8f7; border-radius: 22px; padding: 26px; }
-        .chart-panel h2 { color: #1f2a44; font-size: 1.4rem; margin: 0 0 18px; text-align: left; }
-        h2 { color: #2d3748; margin: 0 0 24px; text-align: center; }
-        @media (max-width: 860px) {
-            .dashboard-grid { display: block; }
-            .status-card,
-            .chart-panel { width: 100%; }
-            .chart-panel h2 { text-align: center; }
-        }
-    </style>
-</head>
-<body>
+{% extends 'base.html' %}
+{% load static %}
 
-<div class="dashboard-container">
-    <h2>Ping Latency Trend Profile (Last 3 Hours)</h2>
-    <div class="dashboard-grid">
-        <div class="status-card">
-            <div class="status-card-heading">Total down devices</div>
-            <div class="status-card-value">{{ down_count }}</div>
-            <div class="status-card-label">Out of current monitored network</div>
-            <div class="status-card-note">Active down count from the latest ping sweep</div>
+{% block title %}Network Sensor Monitor | NOC Dashboard{% endblock %}
+
+{% block extra_css %}
+<!-- Sneat Core Stylesheets -->
+<link rel="stylesheet" href="{% static 'vendor/fonts/iconify-icons.css' %}" />
+<link rel="stylesheet" href="{% static 'vendor/css/core.css' %}" />
+<link rel="stylesheet" href="{% static 'css/demo.css' %}" />
+<link rel="stylesheet" href="{% static 'vendor/libs/perfect-scrollbar/perfect-scrollbar.css' %}" />
+<link rel="stylesheet" href="{% static 'vendor/libs/apex-charts/apex-charts.css' %}" />
+
+<link rel="stylesheet" href="{% static 'css/flatpickr.min.css' %}">
+<script src="{% static 'js/flatpickr.js' %}"></script>
+
+<!-- Sneat Head Helper Scripts -->
+<script src="{% static 'vendor/js/helpers.js' %}"></script>
+<script src="{% static 'js/config.js' %}"></script>
+
+<style>
+    /* 
+       UNCOMMENT THE LINES BELOW if you wish to run the dashboard in a completely full-screen compact mode,
+       hiding the base.html sidebar and header layout.
+    */
+    /*
+    .layout-menu, .layout-navbar, .menu-mobile-toggler, .layout-overlay, .drag-target, .buy-now, .customizer { display: none !important; }
+    .layout-page { padding-left: 0 !important; padding-top: 0 !important; width: 100% !important; }
+    .layout-container, .layout-wrapper { padding-left: 0 !important; }
+    .content-wrapper { padding-top: 1.5rem !important; }
+    */
+
+    /* 
+       Force body/html background to prevent core.css from breaking dark mode 
+       and match AddIP.html
+    */
+    html,
+    body {
+        background-color: var(--bg-body) !important;
+        color: var(--text-main) !important;
+        overflow-y: auto !important;
+    }
+
+
+
+    /* Premium Theme Style Overrides for Sneat Components */
+    .card {
+        background: var(--bg-card) !important;
+        backdrop-filter: blur(var(--glass-blur));
+        border: 1px solid var(--border-subtle) !important;
+        border-radius: 20px !important;
+        box-shadow: var(--shadow-premium) !important;
+        transition: var(--transition-smooth) !important;
+    }
+
+    .card:hover {
+        transform: translateY(-4px);
+        background: var(--bg-card-hover) !important;
+        box-shadow: 0 12px 36px 0 rgba(0, 0, 0, 0.45) !important;
+        border-color: var(--border-glow) !important;
+    }
+
+    .card-header,
+    .card-body {
+        background: transparent !important;
+        color: var(--text-main) !important;
+    }
+
+    .card-title,
+    h5,
+    h6 {
+        color: var(--text-title) !important;
+        font-family: var(--font-outfit) !important;
+    }
+
+    /* Avatar & Icon Soft Backgrounds */
+    .avatar-noc {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        transition: var(--transition-smooth);
+    }
+
+    .avatar-noc.online {
+        background: rgba(16, 185, 129, 0.1) !important;
+        color: var(--success) !important;
+        border: 1px solid rgba(16, 185, 129, 0.2);
+        box-shadow: 0 0 12px rgba(16, 185, 129, 0.05);
+    }
+
+    .avatar-noc.offline {
+        background: rgba(244, 63, 94, 0.1) !important;
+        color: var(--danger) !important;
+        border: 1px solid rgba(244, 63, 94, 0.2);
+        box-shadow: 0 0 12px rgba(244, 63, 94, 0.05);
+        animation: card-alert-pulse 2s infinite;
+    }
+
+    @keyframes card-alert-pulse {
+        0% {
+            border-color: rgba(244, 63, 94, 0.2);
+        }
+
+        50% {
+            border-color: rgba(244, 63, 94, 0.5);
+        }
+
+        100% {
+            border-color: rgba(244, 63, 94, 0.2);
+        }
+    }
+
+    /* List Item Styling */
+    .sensorList {
+        list-style-type: none !important;
+        padding: 0;
+        margin: 0;
+    }
+
+    .sensor-item {
+        padding: 12px 8px;
+        border-radius: 12px;
+        transition: var(--transition-smooth);
+    }
+
+    .sensor-item:hover {
+        background: rgba(255, 255, 255, 0.03);
+    }
+
+    /* Buttons Override */
+    .btn-label-primary {
+        background-color: rgba(59, 130, 246, 0.15) !important;
+        color: var(--primary) !important;
+        border: 1px solid rgba(59, 130, 246, 0.1) !important;
+    }
+
+    .btn-label-primary:hover {
+        background-color: var(--primary) !important;
+        color: white !important;
+    }
+
+    .btn-outline-primary {
+        border-color: rgba(59, 130, 246, 0.4) !important;
+        color: var(--primary) !important;
+    }
+
+    .btn-outline-primary:hover {
+        background-color: var(--primary) !important;
+        color: #fff !important;
+    }
+
+    /* Smooth Slide for latency container */
+    #latencyCardContainer {
+        display: none;
+        animation: slideDownIn 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @keyframes slideDownIn {
+        from {
+            opacity: 0;
+            transform: translateY(-20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="row mb-6">
+    <div class="col-12">
+        <h4 class="fw-bold py-3 mb-0" style="font-family: var(--font-outfit); color: var(--text-title);">
+            <span class="text-muted fw-light">Analytics /</span> Network Dashboard
+        </h4>
+    </div>
+</div>
+
+<div class="row mb-6">
+    {% for dept, dept_data in departments.items %}
+    <!-- Health gauge panel for department -->
+    <div class="col-lg-3 col-md-6 mb-6"
+        onclick="document.getElementById('sensors-list-container-{{ dept_data.id }}').scrollIntoView({behavior: 'smooth'})"
+        style="cursor: pointer;">
+        <div class="card h-100 dept-health-card" data-dept-id="{{ dept_data.id }}">
+            <div class="card-body px-xl-9 py-12 d-flex align-items-center flex-column">
+                <div class="text-center mb-6">
+                    <div class="btn-group">
+                        <button type="button" class="btn btn-label-primary">
+                            {{ dept }} Health
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Radial Gauge SVG/Canvas -->
+                <div class="growthChart" id="growthChart_{{ dept_data.id }}"></div>
+
+
+
+                <!-- Availability breakdown statistics -->
+                <div class="d-flex gap-5 justify-content-between w-100 px-4 mt-2">
+                    <div class="d-flex align-items-center">
+                        <div class="avatar-noc online me-2">
+                            <i class="fa-solid fa-circle-check"></i>
+                        </div>
+                        <div class="d-flex flex-column">
+
+                            <h6 class="mb-0 countOn" style="font-size: x-large;" id="countOn_{{ dept_data.id }}">0</h6>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center" style="cursor: pointer;">
+                        <div class="avatar-noc offline me-2">
+                            <i class="fa-solid fa-circle-exclamation"></i>
+                        </div>
+                        <div class="d-flex flex-column">
+
+                            <h6 class="mb-0 countOff" style="font-size: x-large;" id="countOff_{{ dept_data.id }}">0
+                            </h6>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="chart-panel">
-            <h2>Latency (msec) over time</h2>
-            <canvas id="latencyChart"></canvas>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            pinOfflineSensors('{{ dept_data.id }}');
+        });
+    </script>
+    {% endfor %}
+</div>
+
+
+<div class="row">
+    {% for dept, dept_data in departments.items %}
+    <!-- Active Sensors Transaction List -->
+    <div class="col-12 mb-6" id="sensors-list-container-{{ dept_data.id }}">
+        <div class="card h-100">
+            <div class="card-header d-flex align-items-center justify-content-between pb-3">
+                <div class="d-flex align-items-center gap-3">
+                    <h5 class="card-title m-0 px-3 py-1">
+                        {{ dept }}</h5>
+
+                </div>
+                <div class="dropdown">
+                    <button class="btn btn-primary btn-sm fw-semibold" data-bs-toggle="modal"
+                        data-bs-target="#editIpModal" onclick="setEditIpDbId('{{ dept_data.id }}')"
+                        style="border-radius: 8px; padding: 4px 16px;">Edit</button>
+                </div>
+            </div>
+
+            <div class="card-body pt-2">
+                <ul class="p-0 m-0 sensorList" id="sensorList_{{ dept_data.id }}">
+                    {% if ErrorGettingSensorData %}
+                    <li class="text-danger p-3">{{ ErrorGettingSensorData }}</li>
+                    {% else %}
+                    {% for s in dept_data.sensors %}
+                    <!-- Wrapped everything inside a single item container to keep layouts clean -->
+                    <li class="sensor-container {% if not forloop.last %}mb-4{% endif %}" data-status="{{ s.status }}"
+                        onclick="window.location.href='/graphs?sensorID={{ s.id }}&serverID={{ dept_data.id }}'"
+                        style="cursor: pointer;">
+                        <div class="d-flex align-items-center sensor-item">
+                            <div class="avatar-noc {% if s.status == 'on' %}online{% else %}offline{% endif %} me-3">
+                                {% if s.type == 'Ping' %}
+                                <i class="fa-solid fa-arrow-down-up-lock"></i>
+                                {% elif s.type == 'Gateway' %}
+                                <i class="fa-solid fa-circle-nodes"></i>
+                                {% elif s.type == 'Switch' %}
+                                <i class="fa-solid fa-server"></i>
+                                {% elif s.type == 'Access Point' %}
+                                <i class="fa-solid fa-wifi"></i>
+                                {% elif s.type == 'Firewall' %}
+                                <i class="fa-solid fa-shield-halved"></i>
+                                {% else %}
+                                <i class="fa-solid fa-network-wired"></i>
+                                {% endif %}
+                            </div>
+
+                            <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
+                                <div class="me-2">
+                                    <small class="text-muted d-block"
+                                        style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
+                                        {{ s.type }}
+                                    </small>
+                                    <h6 class="fw-semibold mb-0" style="font-size: 0.95rem;">{{ s.name }}</h6>
+                                </div>
+                                <div class="user-progress d-flex align-items-center gap-2">
+                                    <h6
+                                        class="fw-bold mb-0 {% if s.status == 'on' %}text-success{% else %}text-danger{% endif %}">
+                                        {% if s.status == 'on' %}+{{ s.avgLatency }}{% else %}-{% endif %}
+                                    </h6>
+                                    <span class="text-muted" style="font-size: 0.8rem;">ms</span>
+                                    <a href="javascript:void(0);">
+                                        <button class="btn btn-sm btn-icon btn-outline-primary ms-3"
+                                            onclick="window.location.href='/graphs?sensorID={{ s.id }}&serverID={{ dept_data.id }}'"
+                                            title="Inspect Latency Profile">
+                                            <i class="fa-solid fa-chart-line"></i>
+                                        </button>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    {% endfor %}
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Detailed Latency Area Chart (Dynamically populated on click) -->
+<div class="row">
+    <div class="col-12 mb-6" id="latencyCardContainer">
+        <div class="card">
+            <div class="card-body">
+                <div class="tab-content p-0">
+                    <div class="tab-pane fade show active" role="tabpanel">
+                        <div class="d-flex mb-6 align-items-center">
+                            <!-- Latency indicator logo -->
+                            <div class="avatar-noc online me-3">
+                                <i class="fa-solid fa-gauge-high"></i>
+                            </div>
+                            <div>
+                                <p class="mb-0 text-muted" id="latencyTitle"
+                                    style="font-size: 0.85rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">
+                                    Selected Sensor</p>
+                                <div class="d-flex align-items-center">
+                                    <h5 class="mb-0 me-2" id="latencyValue"
+                                        style="font-size: 1.3rem; font-weight: 700;">-- ms</h5>
+                                    <small class="metric-badge" id="latencyTrend" style="font-size: 0.75rem;">
+                                        <i class="fa-solid fa-circle-question"></i> Select a monitor
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="incomeChart"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<script>
-    // Pull the clean list structures injected by our Django views engine safely into JavaScript
-    const timeLabels = ["02:00 PM", "02:15 PM", "02:30 PM", "02:45 PM", "03:00 PM", "03:15 PM", "03:30 PM", "03:45 PM", "04:00 PM", "04:15 PM", "04:30 PM", "04:45 PM"];
-    const pingMetrics = [0.4, 0.5, 1.2, 0.3, 0.4, 2.1, 0.5, 0.6, 0.3, 0.4, 0.9, 0.5];
 
-    const ctx = document.getElementById('latencyChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: timeLabels,
-            datasets: [{
-                label: 'Latency (msec)',
-                data: pingMetrics,
-                borderColor: '#4c51bf', // Clean slate blue color accent
-                backgroundColor: 'rgba(76, 81, 191, 0.06)',
-                borderWidth: 2.5,
-                tension: 0.25, // Smooths out jagged network peaks into clean curves
-                pointRadius: 3,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            scales: {
-                x: { title: { display: true, text: 'Timeline Interval (5 Min Average)' } },
-                y: { title: { display: true, text: 'Response Delay Speed (msec)' }, beginAtZero: true }
+<!-- Edit IP Modal -->
+<div class="modal fade" id="editIpModal" tabindex="-1" aria-labelledby="editIpModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content"
+            style="background: #ffffff; color: #475569; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.1);">
+            <div class="modal-header" style="border-bottom: 1px solid #e2e8f0;">
+                <h5 class="modal-title fw-semibold" id="editIpModalLabel" style="color: #000000 !important;">Edit Device
+                    IP</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editIpForm">
+                    <input type="hidden" id="editIpDbId" value="">
+                    <div class="mb-3">
+                        <label for="newIpAddress" class="form-label fw-medium" style="color: #1e293b;">New IP
+                            Address</label>
+                        <input type="text" class="form-control" id="newIpAddress" placeholder="e.g. 192.168.1.1"
+                            required style="background: transparent; color: #1e293b; border: 1px solid #e2e8f0;">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #e2e8f0;">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"
+                    style="color: #475569; border-color: #e2e8f0;">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveIpBtn" onclick="submitEditIp()">Save
+                    Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- Sneat Body Scripts -->
+<script src="{% static 'vendor/libs/jquery/jquery.js' %}"></script>
+<script src="{% static 'vendor/libs/popper/popper.js' %}"></script>
+<script src="{% static 'vendor/js/bootstrap.js' %}"></script>
+<script src="{% static 'vendor/libs/perfect-scrollbar/perfect-scrollbar.js' %}"></script>
+<script src="{% static 'vendor/libs/hammer/hammer.js' %}"></script>
+<script src="{% static 'vendor/libs/i18n/i18n.js' %}"></script>
+<script src="{% static 'vendor/js/menu.js' %}"></script>
+<script src="{% static 'vendor/libs/apex-charts/apexcharts.js' %}"></script>
+<script src="{% static 'js/main.js' %}"></script>
+
+<script>
+    // Define outside to be accessible globally
+    var incomeChartInstance = null;
+    var incomeChartEl = document.getElementById('incomeChart');
+    // Safely parse Django serialized JSON sensors list
+    var sensors = {{ sensors_json| safe }};
+
+    window.showChart = function (id) {
+        var s = sensors.find(function (x) { return x.id == id });
+        if (!s) return;
+
+        var latencyCard = document.getElementById('latencyCardContainer');
+        latencyCard.style.display = 'block';
+
+        const getPrimaryColor = () => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#3b82f6';
+        const getTextMuted = () => getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#64748b';
+        const getBorderColor = () => getComputedStyle(document.documentElement).getPropertyValue('--border-subtle').trim() || 'rgba(255,255,255,0.06)';
+
+        document.getElementById('latencyTitle').textContent = s.name + ' (' + s.type + ')';
+        document.getElementById('latencyValue').textContent = s.avgLatency + ' ms';
+
+        var trendEl = document.getElementById('latencyTrend');
+        if (s.status === 'on') {
+            trendEl.className = 'metric-badge badge-success-glow';
+            trendEl.innerHTML = '<i class="fa-solid fa-circle-check"></i> Monitor Active';
+        } else {
+            trendEl.className = 'metric-badge badge-danger-glow';
+            trendEl.innerHTML = '<i class="fa-solid fa-circle-exclamation"></i> Node Unreachable';
+        }
+
+        var options = {
+            series: [{
+                name: 'Latency',
+                data: s.latencyHistory ? s.latencyHistory.map(function (d) { return d.y }) : []
+            }],
+            chart: {
+                height: 220,
+                parentHeightOffset: 0,
+                parentWidthOffset: 0,
+                toolbar: { show: false },
+                type: 'area',
+                background: 'transparent'
+            },
+            dataLabels: { enabled: false },
+            stroke: {
+                width: 3,
+                curve: 'smooth',
+                colors: [getPrimaryColor()]
+            },
+            legend: { show: false },
+            markers: {
+                size: 5,
+                colors: ['#ffffff'],
+                strokeColors: [getPrimaryColor()],
+                strokeWidth: 2,
+                hover: { size: 7 }
+            },
+            colors: [getPrimaryColor()],
+            fill: {
+                type: 'gradient',
+                gradient: {
+                    shade: 'dark',
+                    shadeIntensity: 0.4,
+                    opacityFrom: 0.45,
+                    opacityTo: 0.02,
+                    stops: [0, 95, 100]
+                }
+            },
+            grid: {
+                borderColor: getBorderColor(),
+                strokeDashArray: 3,
+                padding: { top: -20, bottom: -8, left: 0, right: 8 }
+            },
+            xaxis: {
+                categories: s.latencyHistory ? s.latencyHistory.map(function (d) {
+                    var dt = new Date(d.x);
+                    return dt.getHours() + ':' + (dt.getMinutes() < 10 ? '0' : '') + dt.getMinutes();
+                }) : [],
+                axisBorder: { show: false },
+                axisTicks: { show: false },
+                labels: {
+                    show: true,
+                    style: {
+                        fontSize: '11px',
+                        colors: getTextMuted(),
+                        fontFamily: 'Inter, sans-serif'
+                    }
+                }
+            },
+            yaxis: {
+                labels: {
+                    show: true,
+                    style: {
+                        fontSize: '11px',
+                        colors: getTextMuted(),
+                        fontFamily: 'Inter, sans-serif'
+                    }
+                },
+                min: 0,
+                max: s.latencyHistory && s.latencyHistory.length > 0 ? Math.max.apply(null, s.latencyHistory.map(function (d) { return d.y })) + 10 : 100,
+                tickAmount: 4
+            },
+            theme: {
+                mode: document.body.classList.contains('light-theme') ? 'light' : 'dark'
             }
+        };
+
+        if (incomeChartInstance) {
+            incomeChartInstance.destroy();
+        }
+        incomeChartInstance = new ApexCharts(incomeChartEl, options);
+        incomeChartInstance.render();
+
+        setTimeout(function () {
+            latencyCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 120);
+    };
+
+    document.addEventListener("DOMContentLoaded", function () {
+        'use strict';
+        var onlinePct = parseInt("{{ online_pct }}", 10);
+
+        // UI elements config
+        const getPrimaryColor = () => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#3b82f6';
+        const getTextTitle = () => getComputedStyle(document.documentElement).getPropertyValue('--text-title').trim() || '#ffffff';
+        const getTextMuted = () => getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#64748b';
+        const getBorderColor = () => getComputedStyle(document.documentElement).getPropertyValue('--border-subtle').trim() || 'rgba(255,255,255,0.06)';
+
+        // ------------------------------------------------------------------------
+        // Radial Availability Gauge
+        // ------------------------------------------------------------------------
+        window.growthCharts = [];
+        const deptCards = document.querySelectorAll('.dept-health-card');
+        deptCards.forEach(card => {
+            const deptId = card.getAttribute('data-dept-id');
+            const sensorList = document.getElementById('sensorList_' + deptId);
+
+            let onCount = 0;
+            let offCount = 0;
+            if (sensorList) {
+                const sensorElems = sensorList.querySelectorAll('.sensor-container');
+                sensorElems.forEach(s => {
+                    if (s.getAttribute('data-status') === 'on') {
+                        onCount++;
+                    } else {
+                        offCount++;
+                    }
+                });
+            }
+            const total = onCount + offCount;
+            const deptOnlinePct = total > 0 ? Math.round((onCount / total) * 100) : 0;
+
+            const countOnEl = document.getElementById('countOn_' + deptId);
+            const countOffEl = document.getElementById('countOff_' + deptId);
+            const healthLabelEl = document.getElementById('healthLabel_' + deptId);
+
+            if (countOnEl) countOnEl.innerText = onCount;
+            if (countOffEl) countOffEl.innerText = offCount;
+            if (healthLabelEl) healthLabelEl.innerText = deptOnlinePct + '% Online';
+
+            var growthChartOptions = {
+                series: [deptOnlinePct],
+                labels: ['Availability'],
+                chart: {
+                    height: 240,
+                    type: 'radialBar',
+                    sparkline: { enabled: true }
+                },
+                plotOptions: {
+                    radialBar: {
+                        size: 150,
+                        offsetY: 10,
+                        startAngle: -150,
+                        endAngle: 150,
+                        hollow: { size: '55%' },
+                        track: {
+                            background: getBorderColor(),
+                            strokeWidth: '100%'
+                        },
+                        dataLabels: {
+                            name: {
+                                offsetY: 15,
+                                color: 'rgba(148, 163, 184, 0.5)',
+                                fontSize: '13px',
+                                fontWeight: '900',
+                                fontFamily: 'Outfit, Inter, sans-serif'
+                            },
+                            value: {
+                                offsetY: -22,
+                                color: getTextMuted(),
+                                fontSize: '22px',
+                                fontWeight: '700',
+                                fontFamily: 'Outfit, Inter, sans-serif',
+                                formatter: function (val) {
+                                    return val + "%";
+                                }
+                            }
+                        }
+                    }
+                },
+                colors: [getPrimaryColor()],
+                fill: {
+                    type: 'solid',
+                    opacity: 1
+                },
+                stroke: { dashArray: 5 }
+            };
+
+            const chartEl = document.getElementById('growthChart_' + deptId);
+            if (chartEl) {
+                var growthChart = new ApexCharts(chartEl, growthChartOptions);
+                growthChart.render();
+                window.growthCharts.push({ id: deptId, chart: growthChart });
+            }
+        });
+
+        // Update charts styling dynamically when Light/Dark theme changes
+        const themeBtn = document.querySelector('.theme-toggle');
+        if (themeBtn) {
+            themeBtn.addEventListener('click', () => {
+                setTimeout(() => {
+                    const newPrimary = getPrimaryColor();
+                    const newMuted = getTextMuted();
+                    const newBorder = getBorderColor();
+                    const newTitle = getTextTitle();
+                    const isLight = document.body.classList.contains('light-theme');
+
+                    // Update Radial Gauge
+                    window.growthCharts.forEach(obj => {
+                        obj.chart.updateOptions({
+                            plotOptions: {
+                                radialBar: {
+                                    track: { background: newBorder },
+                                    dataLabels: {
+                                        name: { color: newMuted },
+                                        value: { color: newMuted }
+                                    }
+                                }
+                            },
+                            colors: [newPrimary]
+                        });
+                    });
+
+                    // Update Area chart if loaded
+                    if (incomeChartInstance) {
+                        incomeChartInstance.updateOptions({
+                            stroke: { colors: [newPrimary] },
+                            markers: { strokeColors: [newPrimary] },
+                            colors: [newPrimary],
+                            grid: { borderColor: newBorder },
+                            xaxis: {
+                                labels: { style: { colors: newMuted } }
+                            },
+                            yaxis: {
+                                labels: { style: { colors: newMuted } }
+                            },
+                            theme: {
+                                mode: isLight ? 'light' : 'dark'
+                            }
+                        });
+                    }
+                }, 150);
+            });
         }
     });
 </script>
 
-</body>
-</html>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Toast functionality
+        function showToast(message, type = 'error') {
+            let container = document.getElementById('toastContainer');
+            if (!container) {
+                container = document.createElement('div');
+                container.id = 'toastContainer';
+                container.style.cssText = 'position: fixed; top: 24px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 12px;';
+                document.body.appendChild(container);
+            }
+
+            const toast = document.createElement('div');
+            toast.style.cssText = `min-width: 300px; background: var(--bg-card, #ffffff); border-left: 4px solid ${type === 'success' ? '#10b981' : '#ef4444'}; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 8px; padding: 16px 20px; display: flex; align-items: flex-start; gap: 12px; transform: translateX(120%); opacity: 0; transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);`;
+
+            const iconHtml = type === 'success' ? '<i class="fa-solid fa-circle-check" style="color: #10b981; font-size: 1.25rem;"></i>' : '<i class="fa-solid fa-circle-exclamation" style="color: #ef4444; font-size: 1.25rem;"></i>';
+
+            toast.innerHTML = `
+                <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center;">${iconHtml}</div>
+                <div style="flex-grow: 1; font-family: 'Outfit', sans-serif; font-size: 0.95rem; color: var(--text-title, #1e293b); line-height: 1.4;">${message}</div>
+            `;
+
+            container.appendChild(toast);
+            void toast.offsetWidth;
+            toast.style.transform = 'translateX(0)';
+            toast.style.opacity = '1';
+
+            setTimeout(() => {
+                toast.style.transform = 'translateX(120%)';
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 400);
+            }, 3000);
+        }
+        window.showToast = showToast;
+
+        // Turn inputs with 'datetime-picker' class into advanced calendars
+        flatpickr(".datetime-picker", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+            time_24hr: true,
+            defaultDate: new Date(),
+            allowInput: true
+        });
+
+        // Intercept Add IP click to check login
+        const isAuth = "{{ request.user.is_authenticated }}" === "True";
+        document.body.addEventListener('click', function (e) {
+            const btn = e.target.closest('button, a');
+            // Check if the clicked element is intended for Add IP
+            if (btn && (btn.textContent.trim() === 'Add IP' || btn.getAttribute('href') === '/add_ip/' || btn.getAttribute('href') === '/add_ip')) {
+                if (isAuth) {
+                    // Prevent login modal trigger since user is already logged in
+                    e.preventDefault();
+                    e.stopPropagation();
+                    window.location.href = '/add_ip/';
+                }
+            }
+        }, true); // use capture phase to override Bootstrap modal listeners
+
+        // Inject Logout Button Logic is now handled natively in base.html
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function setEditIpDbId(id) {
+        document.getElementById('editIpDbId').value = id;
+        document.getElementById('newIpAddress').value = '';
+    }
+
+    function submitEditIp() {
+        const dbId = document.getElementById('editIpDbId').value;
+        const newIp = document.getElementById('newIpAddress').value;
+        if (!newIp) return window.showToast('Please enter a new IP address.', 'error');
+
+        const saveBtn = document.getElementById('saveIpBtn');
+        saveBtn.innerText = 'Saving...';
+        saveBtn.disabled = true;
+
+        fetch('/api/get_sensors_by_ip/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ action: 'edit', db_id: dbId, new_ip: newIp })
+        })
+            .then(res => res.json())
+            .then(data => {
+                saveBtn.innerText = 'Save Changes';
+                saveBtn.disabled = false;
+                if (data.success) {
+                    const modalEl = document.getElementById('editIpModal');
+                    const modal = bootstrap.Modal.getInstance(modalEl);
+                    if (modal) modal.hide();
+                    window.showToast('IP updated successfully!', 'success');
+                    setTimeout(() => window.location.reload(), 1500);
+                } else {
+                    window.showToast(data.message || 'Error updating IP.', 'error');
+                }
+            })
+            .catch(err => {
+                saveBtn.innerText = 'Save Changes';
+                saveBtn.disabled = false;
+                window.showToast('An unexpected error occurred.', 'error');
+            });
+    }
+
+    function pinOfflineSensors(deptId) {
+        let lists = [];
+        if (deptId) {
+            lists = [document.getElementById('sensorList_' + deptId)];
+        } else {
+            lists = document.querySelectorAll('.sensorList');
+        }
+
+        lists.forEach(ul => {
+            if (!ul) return;
+            const items = Array.from(ul.children);
+            items.sort((a, b) => {
+                const aOffline = a.getAttribute('data-status') === 'off' ? -1 : 1;
+                const bOffline = b.getAttribute('data-status') === 'off' ? -1 : 1;
+                return aOffline - bOffline;
+            });
+            items.forEach(li => ul.appendChild(li));
+        });
+    }
+
+    function submitNativeForm() {
+        const form = document.getElementById('timelineForm');
+
+        // Check if the HTML5 form validation criteria are satisfied (checks 'required' and 'min')
+        if (form.checkValidity()) {
+            form.submit(); // Submits natively and reloads the full page to hit your views.py
+        } else {
+            // Triggers the built-in browser validation alerts if fields are blank
+            form.reportValidity();
+        }
+    }
+
+</script>
+
+
+{% endblock %}

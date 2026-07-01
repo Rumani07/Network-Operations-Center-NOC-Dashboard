@@ -172,7 +172,7 @@
                 </div>
                 <div>
                     <button type="button" class="btn btn-primary px-4 py-2 fw-bold"
-                        onclick="getElementById('timelineForm').action='/api/sensor_csv_data/';getElementById('timelineForm').submit();"
+                        onclick="if(window.validateDates()) { document.getElementById('timelineForm').action='/api/sensor_csv_data/'; document.getElementById('timelineForm').submit(); }"
                         style="border-radius: 10px;">Download</button>
                 </div>
             </form>
@@ -255,12 +255,53 @@
 <script src="{% static 'vendor/libs/apex-charts/apexcharts.js' %}"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
+        // Validation logic
+        window.validateDates = function() {
+            const startVal = document.getElementById('startDateTime').value;
+            const endVal = document.getElementById('endDateTime').value;
+            if (!startVal || !endVal) return true;
+            const start = new Date(startVal);
+            const end = new Date(endVal);
+            if (start >= end) {
+                alert("End Date Time must be greater than Start Date Time.");
+                return false;
+            }
+            return true;
+        };
+
+        document.getElementById('timelineForm').addEventListener('submit', function(e) {
+            // Reset action to default (empty) in case download was clicked previously
+            if (this.action.includes('/api/sensor_csv_data/')) {
+                this.action = '';
+            }
+            if (!window.validateDates()) {
+                e.preventDefault();
+            }
+        });
+
         // Initialize datetime pickers
-        flatpickr(".datetime-picker", {
+        let startPicker, endPicker;
+
+        startPicker = flatpickr("#startDateTime", {
             enableTime: true,
             dateFormat: "Y-m-d H:i",
             time_24hr: true,
-            allowInput: true
+            allowInput: true,
+            maxDate: new Date(),
+            onChange: function(selectedDates, dateStr, instance) {
+                if (endPicker) endPicker.set('minDate', dateStr);
+            }
+        });
+
+        endPicker = flatpickr("#endDateTime", {
+            enableTime: true,
+            dateFormat: "Y-m-d H:i",
+            time_24hr: true,
+            allowInput: true,
+            maxDate: new Date(),
+            onChange: function(selectedDates, dateStr, instance) {
+                if (startPicker) startPicker.set('maxDate', dateStr);
+            }
         });
 
         // Safely parse JSON data from Django context
@@ -308,16 +349,12 @@
 
         // Ping Chart
         const pingData = pingDataRaw.map(d => {
-            // Assume format is DD/MM/YYYY HH:MM:SS or similar. ApexCharts needs ISO or timestamp.
-            // If it's already an ISO string or timestamp it will work.
-            // For custom format like "01/01/2026 12:00:00" or "14-06-2026 11:30:00", we need parsing.
-            let parts = d.x.split(/[\s/:-]/);
-            let dt;
-            if (parts.length >= 6) {
-                // DD/MM/YYYY HH:MM:SS
-                dt = new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]).getTime();
-            } else {
-                dt = new Date(d.x).getTime();
+            let dt = new Date(d.x).getTime();
+            if (isNaN(dt)) {
+                let parts = d.x.split(/[\s/:-]/);
+                if (parts.length >= 6) {
+                    dt = new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]).getTime();
+                }
             }
             return [dt, d.y];
         });
@@ -334,12 +371,12 @@
 
         // Traffic Chart
         const trafficData = trafficDataRaw.map(d => {
-            let parts = d.x.split(/[\s/:-]/);
-            let dt;
-            if (parts.length >= 6) {
-                dt = new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]).getTime();
-            } else {
-                dt = new Date(d.x).getTime();
+            let dt = new Date(d.x).getTime();
+            if (isNaN(dt)) {
+                let parts = d.x.split(/[\s/:-]/);
+                if (parts.length >= 6) {
+                    dt = new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]).getTime();
+                }
             }
             return [dt, d.y];
         });
