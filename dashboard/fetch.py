@@ -16,7 +16,6 @@ def get_historic_data_api(sensorID, protocol, startDT, endDT, interval,PRTG_HOST
         response = requests.get(URL, verify=False)
         response.raise_for_status()
         data = response.json()
-        print(data.get('histdata', []))
         return data.get('histdata', [])
     except Exception as e:
         print(" Exception occured: ",e)
