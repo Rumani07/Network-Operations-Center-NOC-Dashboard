@@ -127,7 +127,23 @@ def sensor_graphs_view(request):
     # Process historic data for charts
     ping_data = []
     traffic_data = []
+    volume_data = []
+    speed_data = []
+    uptime_data = []
     
+    is_bandwidth = False
+    is_ping = False
+    is_uptime = False
+    
+    if historic_data and len(historic_data) > 0:
+        first_row = historic_data[0]
+        if "Traffic Total (Volume)" in first_row or "Traffic Total (Speed)" in first_row:
+            is_bandwidth = True
+        elif "Ping Time" in first_row:
+            is_ping = True
+        elif "System Uptime" in first_row:
+            is_uptime = True
+
     for row in historic_data:
         dt_str = row.get("datetime")
         if not dt_str:
@@ -138,32 +154,65 @@ def sensor_graphs_view(request):
         if " - " in dt_str:
             dt_str = dt_str.split(" - ")[0]
             
-        ping = row.get("Ping Time", row.get("Health", row.get("Ping", row.get("Response Time", row.get("value_raw", row.get("value"))))))
-        traffic = row.get("Traffic Total", row.get("System CPU Load", row.get("Traffic In", row.get("Packet Loss", row.get("Downtime", row.get("value_raw", row.get("value")))))))
-        
-        # If the value is an empty string from PRTG mock, treat as 0 or ignore
-        if ping == '':
-            ping = 0
-        if traffic == '':
-            traffic = 0
+        if is_bandwidth:
+            vol = row.get("Traffic Total (Volume)", 0)
+            spd = row.get("Traffic Total (Speed)", 0)
+            if vol == '': vol = 0
+            if spd == '': spd = 0
+            if vol is not None:
+                try: volume_data.append({"x": dt_str, "y": round(float(vol)*0.000008,2)})
+                except ValueError: pass
+            if spd is not None:
+                try: speed_data.append({"x": dt_str, "y": round(float(spd)*0.000008,2)})
+                except ValueError: pass
+                
+        elif is_ping:
+            ping = row.get("Ping Time", row.get("Ping", 0))
+            if ping == '': ping = 0
+            if ping is not None:
+                try: ping_data.append({"x": dt_str, "y": float(ping)})
+                except ValueError: pass
+                
+        elif is_uptime:
+            uptime = row.get("System Uptime", 0)
+            if uptime == '': uptime = 0
+            if uptime is not None:
+                try: uptime_data.append({"x": dt_str, "y": float(uptime)})
+                except ValueError: pass
+                
+        else:
+            # Fallback
+            ping = row.get("Ping Time", row.get("Health", row.get("Ping", row.get("Response Time", row.get("value_raw", row.get("value"))))))
+            traffic = row.get("Traffic Total", row.get("System CPU Load", row.get("Traffic In", row.get("Packet Loss", row.get("Downtime", row.get("value_raw", row.get("value")))))))
             
-        if ping is not None:
-            try:
-                ping_data.append({"x": dt_str, "y": float(ping)})
-            except ValueError:
-                pass
-        if traffic is not None:
-            try:
-                traffic_data.append({"x": dt_str, "y": float(traffic)})
-            except ValueError:
-                pass
+            if ping == '':
+                ping = 0
+            if traffic == '':
+                traffic = 0
+                
+            if ping is not None:
+                try:
+                    ping_data.append({"x": dt_str, "y": float(ping)})
+                except ValueError:
+                    pass
+            if traffic is not None:
+                try:
+                    traffic_data.append({"x": dt_str, "y": float(traffic)})
+                except ValueError:
+                    pass
             
     context = {
         "sensor_id": sensor_id,
         "server_id":server_id,
         "sensor_details": sensor_details,
+        "is_bandwidth": is_bandwidth,
+        "is_ping": is_ping,
+        "is_uptime": is_uptime,
         "ping_data": json.dumps(ping_data),
         "traffic_data": json.dumps(traffic_data),
+        "volume_data": json.dumps(volume_data),
+        "speed_data": json.dumps(speed_data),
+        "uptime_data": json.dumps(uptime_data),
         "start_dt": start_dt.strftime("%Y-%m-%d %H:%M"),
         "end_dt": end_dt.strftime("%Y-%m-%d %H:%M"),
         "interval_secs": interval_secs
@@ -208,7 +257,20 @@ def sensor_csv_data(request):
     historic_data = get_historic_data_api(sensor_id, sensing.protocol, start_dt, end_dt, interval_secs,sensing.ip,sensing.username,sensing.passhash)
     
     import csv
-    fieldnames=["datetime","datetime_raw","value","value_raw","coverage","coverage_raw"]
+
+    is_bandwidth = False
+    is_ping = False
+    is_uptime = False
+    
+    if historic_data and len(historic_data) > 0:
+        first_row = historic_data[0]
+        if "Traffic Total (Volume)" in first_row or "Traffic Total (Speed)" in first_row:
+            fieldnames=["datetime","Traffic Total (Volume)","Traffic Total (Speed)","Traffic In (Volume)","Traffic Out (Volume)","Traffic In (Speed)","Traffic Out (Speed)","Downtime","coverage"]
+        elif "Ping Time" in first_row:
+            fieldnames=["datetime","Ping Time","Minimum","Maximum","Packet Loss","Downtime","coverage"]
+        elif "System Uptime" in first_row:
+            fieldnames=["datetime","System Uptime","Downtime","coverage"]
+    
     with open("data.csv","w") as f:
         writer=csv.DictWriter(f,fieldnames=fieldnames)
         writer.writeheader()

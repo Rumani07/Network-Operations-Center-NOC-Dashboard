@@ -11,21 +11,23 @@ def get_historic_data_api(sensorID, protocol, startDT, endDT, interval,PRTG_HOST
 
     prtg_s=startDT.strftime("%Y-%m-%d-%H-%M-%S")
     prtg_e=endDT.strftime("%Y-%m-%d-%H-%M-%S")
-    URL = f"{protocol}://{PRTG_HOST}/api/historicdata.json?id={sensorID}&avg={interval}&sdate={prtg_s}&edate={prtg_e}&username={USERNAME}&passhash={PASSHASH}"
+    URL = f"{protocol}://{PRTG_HOST}/api/historicdata.json?id={sensorID}&avg={interval}&sdate={prtg_s}&edate={prtg_e}&username={USERNAME}&passhash={PASSHASH}&usecaption=1"
     try:
-        response = requests.get(URL, verify=False, timeout=3.0)
+        response = requests.get(URL, verify=False)
         response.raise_for_status()
         data = response.json()
+        print(data.get('histdata', []))
         return data.get('histdata', [])
     except Exception as e:
-        return {f"{e}"}
+        print(" Exception occured: ",e)
+        return None
 
 def get_sensor_details(sensorID, protocol, PRTG_HOST, USERNAME, PASSHASH):
 
     URL = f"{protocol}://{PRTG_HOST}/api/table.json?content=sensors&columns=objid,device,sensor,status,lastvalue,location,group&filter_objid={sensorID}&output=json&username={USERNAME}&passhash={PASSHASH}"
     
     try:
-        response = requests.get(URL, verify=False, timeout=3.0)
+        response = requests.get(URL, verify=False)
         response.raise_for_status()
         data = response.json()
         sensors = data.get('sensors', [])

@@ -186,7 +186,8 @@
         <div class="scrollable-graphs pe-2">
 
             <!-- Graph 1: Ping vs Latency -->
-            <div class="card mb-4">
+            {% if is_ping or not is_bandwidth and not is_ping and not is_uptime %}
+            <div class="card mb-4" id="pingCard">
                 <div class="card-header pb-0">
                     <h5 class="card-title mb-0">Ping Latency</h5>
                     <small class="text-muted">Ping vs Latency (Time vs ms)</small>
@@ -195,17 +196,33 @@
                     <div id="pingChart"></div>
                 </div>
             </div>
+            {% endif %}
 
             <!-- Graph 2: Traffic / Bandwidth -->
-            <div class="card mb-4">
+            {% if is_bandwidth or not is_bandwidth and not is_ping and not is_uptime %}
+            <div class="card mb-4" id="trafficCard">
                 <div class="card-header pb-0">
                     <h5 class="card-title mb-0">Traffic Total</h5>
-                    <small class="text-muted">Bandwidth Data (Time vs Volume)</small>
+                    <small class="text-muted">Bandwidth Data</small>
                 </div>
                 <div class="card-body">
                     <div id="trafficChart"></div>
                 </div>
             </div>
+            {% endif %}
+
+            <!-- Graph 3: System Uptime -->
+            {% if is_uptime or not is_bandwidth and not is_ping and not is_uptime %}
+            <div class="card mb-4" id="uptimeCard">
+                <div class="card-header pb-0">
+                    <h5 class="card-title mb-0">System Uptime</h5>
+                    <small class="text-muted">Uptime vs Time</small>
+                </div>
+                <div class="card-body">
+                    <div id="uptimeChart"></div>
+                </div>
+            </div>
+            {% endif %}
 
         </div>
     </div>
@@ -306,8 +323,15 @@
 
         // Safely parse JSON data from Django context
         // Wrapped in strings to prevent IDE auto-formatters from breaking the template tags
+        const isBandwidth = {{ is_bandwidth|yesno:"true,false" }};
+        const isPing = {{ is_ping|yesno:"true,false" }};
+        const isUptime = {{ is_uptime|yesno:"true,false" }};
+        
         const pingDataRaw = JSON.parse("{{ ping_data|escapejs }}");
         const trafficDataRaw = JSON.parse("{{ traffic_data|escapejs }}");
+        const volumeDataRaw = JSON.parse("{{ volume_data|escapejs }}");
+        const speedDataRaw = JSON.parse("{{ speed_data|escapejs }}");
+        const uptimeDataRaw = JSON.parse("{{ uptime_data|escapejs }}");
 
         const getPrimaryColor = () => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#3b82f6';
         const getSuccessColor = () => getComputedStyle(document.documentElement).getPropertyValue('--success').trim() || '#10b981';
@@ -347,8 +371,7 @@
             }
         };
 
-        // Ping Chart
-        const pingData = pingDataRaw.map(d => {
+        function parseDateString(d) {
             let dt = new Date(d.x).getTime();
             if (isNaN(dt)) {
                 let parts = d.x.split(/[\s/:-]/);
@@ -357,39 +380,75 @@
                 }
             }
             return [dt, d.y];
-        });
+        }
 
-        const pingChart = new ApexCharts(document.querySelector("#pingChart"), {
-            ...commonChartOptions,
-            series: [{ name: 'Latency (ms)', data: pingData }],
-            colors: [getPrimaryColor()],
-            yaxis: {
-                title: { text: 'Latency (ms)' }
+        // Ping Chart
+        if (isPing || (!isBandwidth && !isPing && !isUptime)) {
+            const pingData = pingDataRaw.map(parseDateString);
+            
+            if (document.querySelector("#pingChart")) {
+                const pingChart = new ApexCharts(document.querySelector("#pingChart"), {
+                    ...commonChartOptions,
+                    series: [{ name: 'Latency (ms)', data: pingData }],
+                    colors: [getPrimaryColor()],
+                    yaxis: {
+                        title: { text: 'Latency (ms)' }
+                    }
+                });
+                pingChart.render();
             }
-        });
-        pingChart.render();
+        }
+
+        // Uptime Chart
+        if (isUptime || (!isBandwidth && !isPing && !isUptime)) {
+            const uptimeData = uptimeDataRaw.map(parseDateString);
+            
+            if (document.querySelector("#uptimeChart")) {
+                const uptimeChart = new ApexCharts(document.querySelector("#uptimeChart"), {
+                    ...commonChartOptions,
+                    series: [{ name: 'Uptime', data: uptimeData }],
+                    colors: ['#8b5cf6'], // A distinct purple color
+                    yaxis: {
+                        title: { text: 'Uptime' }
+                    }
+                });
+                uptimeChart.render();
+            }
+        }
 
         // Traffic Chart
-        const trafficData = trafficDataRaw.map(d => {
-            let dt = new Date(d.x).getTime();
-            if (isNaN(dt)) {
-                let parts = d.x.split(/[\s/:-]/);
-                if (parts.length >= 6) {
-                    dt = new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5]).getTime();
-                }
+        if (isBandwidth || (!isBandwidth && !isPing && !isUptime)) {
+            let seriesData = [];
+            let colors = [];
+            
+            if (isBandwidth) {
+                const volumeData = volumeDataRaw.map(parseDateString);
+                const speedData = speedDataRaw.map(parseDateString);
+                seriesData = [
+                    { name: 'Volume', data: volumeData },
+                    { name: 'Speed', data: speedData }
+                ];
+                colors = [getPrimaryColor(), getSuccessColor()];
+            } else {
+                const trafficData = trafficDataRaw.map(parseDateString);
+                seriesData = [{ name: 'Traffic / Bandwidth', data: trafficData }];
+                colors = [getSuccessColor()];
             }
-            return [dt, d.y];
-        });
-
-        const trafficChart = new ApexCharts(document.querySelector("#trafficChart"), {
-            ...commonChartOptions,
-            series: [{ name: 'Traffic / Bandwidth', data: trafficData }],
-            colors: [getSuccessColor()],
-            yaxis: {
-                title: { text: 'Volume' }
+            
+            if (document.querySelector("#trafficChart")) {
+                const trafficChart = new ApexCharts(document.querySelector("#trafficChart"), {
+                    ...commonChartOptions,
+                    series: seriesData,
+                    colors: colors,
+                    yaxis: isBandwidth ? [
+                        { title: { text: 'Volume' } },
+                        { opposite: true, title: { text: 'Speed' } }
+                    ] : { title: { text: 'Volume' } },
+                    stroke: { curve: 'smooth', width: 2 }
+                });
+                trafficChart.render();
             }
-        });
-        trafficChart.render();
+        }
     });
 </script>
 {% endblock %}
