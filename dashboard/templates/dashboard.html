@@ -17,7 +17,13 @@
 <!-- Sneat Head Helper Scripts -->
 <script src="{% static 'vendor/js/helpers.js' %}"></script>
 <script src="{% static 'js/config.js' %}"></script>
-
+<style>
+    .error-highlight {
+        background-color: #fcedee;
+        border: 1.5px solid #a82e34;
+        border-radius: 8px;
+    }
+</style>
 <style>
     /* 
        UNCOMMENT THE LINES BELOW if you wish to run the dashboard in a completely full-screen compact mode,
@@ -263,7 +269,8 @@
                     {% else %}
                     {% for s in dept_data.sensors %}
                     <!-- Wrapped everything inside a single item container to keep layouts clean -->
-                    <li class="sensor-container {% if not forloop.last %}mb-4{% endif %}" data-status="{{ s.status }}"
+                    <li class="sensor-container {% if not forloop.last %}mb-4{% endif %} {% if s.status == 'on' %} {% else %}error-highlight{% endif %}"
+                        data-status="{{ s.status }}"
                         onclick="window.location.href='/graphs?sensorID={{ s.id }}&serverID={{ dept_data.id }}'"
                         style="cursor: pointer;">
                         <div class="d-flex align-items-center sensor-item">
@@ -285,13 +292,13 @@
 
                             <div class="d-flex w-100 flex-wrap align-items-center justify-content-between gap-2">
                                 <div class="me-2">
-                                    <small class="text-muted d-block"
-                                        style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
-                                        {{ s.type }}
-                                    </small>
                                     <h6 class="fw-semibold mb-0" style="font-size: 0.95rem;">{{ s.name }}</h6>
                                 </div>
                                 <div class="user-progress d-flex align-items-center gap-2">
+                                    <span class="text-muted d-block"
+                                        style="font-size: 0.8rem; font-weight: 600; text-transform: uppercase;">
+                                        {{s.type }}
+                                    </span>
                                     <h6
                                         class="fw-bold mb-0 {% if s.status == 'on' %}text-success{% else %}text-danger{% endif %}">
                                         {% if s.status == 'on' %}+{{ s.avgLatency }}{% else %}-{% endif %}
